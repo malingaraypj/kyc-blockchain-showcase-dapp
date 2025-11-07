@@ -19,7 +19,7 @@ interface Customer {
 }
 
 export default function ManageCustomersPage() {
-  const { isConnected, userRole, isCorrectNetwork, contract, isCheckingRole } = useWeb3();
+  const { isConnected, userRole, isCorrectNetwork, contract, provider, isCheckingRole } = useWeb3();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -48,38 +48,49 @@ export default function ManageCustomersPage() {
   }, [isConnected, isCorrectNetwork, userRole, isCheckingRole, router]);
 
   useEffect(() => {
-    if (contract && (userRole === 'admin' || userRole === 'owner')) {
+    if (contract && provider && (userRole === 'admin' || userRole === 'owner')) {
       fetchCustomers();
     }
-  }, [contract, userRole]);
+  }, [contract, provider, userRole]);
 
   const fetchCustomers = async () => {
-    if (!contract) return;
+    if (!contract || !provider) return;
     setLoading(true);
     try {
-      const customersCount = await contract.getAllCustomersCount();
-      const count = Number(customersCount);
+      // Get CustomerAdded events to find all customer KYC IDs
+      const filter = contract.filters.CustomerAdded();
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, currentBlock - 100000); // Last 100k blocks
       
+      const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+      
+      // Extract unique KYC IDs from events
+      const kycIds = [...new Set(events.map(event => event.args?.[0] || ''))].filter(id => id);
+      
+      console.log('Found KYC IDs from events:', kycIds);
+      
+      // Fetch details for each customer
       const customersList: Customer[] = [];
-      for (let i = 0; i < count; i++) {
+      for (const kycId of kycIds) {
         try {
-          const customerData = await contract.getAllCustomers(i);
+          const customerData = await contract.getCustomerDetails(kycId);
           customersList.push({
-            kycId: customerData[0],
-            name: customerData[1],
-            pan: customerData[2],
-            kycStatus: Number(customerData[3]),
+            kycId: customerData[0] || kycId,
+            name: customerData[1] || '',
+            pan: customerData[2] || '',
+            kycStatus: Number(customerData[3] || 0),
             vcHash: customerData[4] || '0x0000000000000000000000000000000000000000000000000000000000000000'
           });
         } catch (err) {
-          console.error(`Error fetching customer ${i}:`, err);
+          console.error(`Error fetching customer ${kycId}:`, err);
         }
       }
       
       setCustomers(customersList);
+      console.log('Fetched customers:', customersList);
     } catch (error) {
       console.error('Error fetching customers:', error);
-      toast.error('Failed to fetch customers');
+      toast.error('Failed to fetch customers. Make sure you\'re connected to the correct network.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +123,11 @@ export default function ManageCustomersPage() {
         vcHash: ''
       });
       setShowAddForm(false);
-      fetchCustomers();
+      
+      // Wait a bit for blockchain to update then refresh
+      setTimeout(() => {
+        fetchCustomers();
+      }, 2000);
     } catch (error: any) {
       console.error('Error adding customer:', error);
       toast.error(error?.reason || 'Failed to add customer');
