@@ -6,6 +6,7 @@ import Script from "next/script";
 import { Web3Provider } from "@/contexts/Web3Context";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "KYC Chain - Decentralized KYC Management",
@@ -38,6 +39,7 @@ export default function RootLayout({
           </main>
           <Footer />
         </Web3Provider>
+        <Toaster />
         <VisualEditsMessenger />
       </body>
     </html>
