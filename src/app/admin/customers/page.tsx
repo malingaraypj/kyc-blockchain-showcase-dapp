@@ -57,23 +57,42 @@ export default function ManageCustomersPage() {
     if (!contract || !provider) return;
     setLoading(true);
     try {
+      console.log('Starting to fetch customers...');
+      console.log('Contract:', contract.target);
+      console.log('Provider:', provider);
+      
       // Get CustomerAdded events to find all customer KYC IDs
       const filter = contract.filters.CustomerAdded();
       const currentBlock = await provider.getBlockNumber();
       const fromBlock = Math.max(0, currentBlock - 100000); // Last 100k blocks
       
+      console.log(`Querying events from block ${fromBlock} to ${currentBlock}`);
+      
       const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+      
+      console.log(`Found ${events.length} CustomerAdded events`);
       
       // Extract unique KYC IDs from events
       const kycIds = [...new Set(events.map(event => event.args?.[0] || ''))].filter(id => id);
       
       console.log('Found KYC IDs from events:', kycIds);
       
+      if (kycIds.length === 0) {
+        console.log('No customer events found in the blockchain');
+        toast.info('No customers found on the blockchain yet');
+        setCustomers([]);
+        setLoading(false);
+        return;
+      }
+      
       // Fetch details for each customer
       const customersList: Customer[] = [];
       for (const kycId of kycIds) {
         try {
+          console.log(`Fetching details for customer: ${kycId}`);
           const customerData = await contract.getCustomerDetails(kycId);
+          console.log(`Customer data for ${kycId}:`, customerData);
+          
           customersList.push({
             kycId: customerData[0] || kycId,
             name: customerData[1] || '',
@@ -86,11 +105,20 @@ export default function ManageCustomersPage() {
         }
       }
       
+      console.log('Final customers list:', customersList);
       setCustomers(customersList);
-      console.log('Fetched customers:', customersList);
-    } catch (error) {
+      
+      if (customersList.length > 0) {
+        toast.success(`Loaded ${customersList.length} customer${customersList.length > 1 ? 's' : ''}`);
+      }
+    } catch (error: any) {
       console.error('Error fetching customers:', error);
-      toast.error('Failed to fetch customers. Make sure you\'re connected to the correct network.');
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        reason: error?.reason
+      });
+      toast.error(`Failed to fetch customers: ${error?.message || 'Unknown error'}. Check browser console for details.`);
     } finally {
       setLoading(false);
     }
