@@ -59,7 +59,6 @@ export default function ManageCustomersPage() {
     try {
       console.log('Starting to fetch customers...');
       console.log('Contract:', contract.target);
-      console.log('Provider:', provider);
       
       // Get CustomerAdded events to find all customer KYC IDs
       const filter = contract.filters.CustomerAdded();
@@ -71,15 +70,46 @@ export default function ManageCustomersPage() {
       const events = await contract.queryFilter(filter, fromBlock, currentBlock);
       
       console.log(`Found ${events.length} CustomerAdded events`);
+      console.log('Sample event:', events[0]);
       
-      // Extract unique KYC IDs from events
-      const kycIds = [...new Set(events.map(event => event.args?.[0] || ''))].filter(id => id);
+      // CustomerAdded event structure: indexed string is hashed, we need the non-indexed parameter
+      // Try different ways to access the KYC ID from event args
+      const kycIds: string[] = [];
       
-      console.log('Found KYC IDs from events:', kycIds);
+      for (const event of events) {
+        try {
+          console.log('Event args:', event.args);
+          
+          // Try accessing by index - the non-indexed kycId should be at index 1
+          // Typically: CustomerAdded(indexed address, string kycId, string name)
+          let kycId = '';
+          
+          // Try different argument positions
+          if (event.args && event.args.length > 1) {
+            // Try index 1 (likely the non-indexed kycId)
+            kycId = event.args[1];
+          } else if (event.args && event.args.length > 0) {
+            // Fallback to index 0
+            kycId = event.args[0];
+          }
+          
+          // Check if it's a valid string (not a hash object)
+          if (typeof kycId === 'string' && kycId && kycId.length > 0) {
+            if (!kycIds.includes(kycId)) {
+              kycIds.push(kycId);
+              console.log('Found valid KYC ID:', kycId);
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing event:', err);
+        }
+      }
+      
+      console.log('Extracted KYC IDs:', kycIds);
       
       if (kycIds.length === 0) {
-        console.log('No customer events found in the blockchain');
-        toast.info('No customers found on the blockchain yet');
+        console.log('No valid KYC IDs found in events');
+        toast.info('No customers found. Make sure to add customers first.');
         setCustomers([]);
         setLoading(false);
         return;
