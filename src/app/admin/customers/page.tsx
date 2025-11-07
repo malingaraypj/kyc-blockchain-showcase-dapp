@@ -110,22 +110,28 @@ export default function ManageCustomersPage() {
       }
       
       // Extract customer data from events
-      // Note: indexed string parameters are hashed, but non-indexed params (name, pan) are available
+      // Use event signature + block number + transaction index for unique identification
       const customersList: Customer[] = [];
-      const seenNames = new Set<string>();
+      const seenEventIds = new Set<string>();
       
       for (const event of events) {
         try {
+          // Create unique identifier for this event (blockNumber + transactionIndex + logIndex)
+          const eventId = `${event.blockNumber}-${event.transactionIndex}-${event.index}`;
+          
+          // Skip if we've already processed this exact event
+          if (seenEventIds.has(eventId)) {
+            console.log(`Skipping duplicate event: ${eventId}`);
+            continue;
+          }
+          seenEventIds.add(eventId);
+          
           const name = event.args?.[1] || '';
           const pan = event.args?.[2] || '';
           
-          // Skip duplicates (same name added multiple times)
-          if (seenNames.has(name)) continue;
-          seenNames.add(name);
+          console.log(`Processing event ${eventId}: name="${name}", pan="${pan}"`);
           
-          // Try to fetch full details using getCustomerDetails if we had the kycId
-          // Since indexed strings are hashed, we can't get kycId from events
-          // So we'll show partial data from events
+          // Add customer from event data
           customersList.push({
             kycId: 'N/A (Contract Issue)',
             name: name,
@@ -138,7 +144,7 @@ export default function ManageCustomersPage() {
         }
       }
       
-      console.log('Customers from events:', customersList);
+      console.log(`Final customers list: ${customersList.length} customers`, customersList);
       setCustomers(customersList);
       
       if (customersList.length > 0) {
