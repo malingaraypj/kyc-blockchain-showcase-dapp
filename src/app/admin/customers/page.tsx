@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Plus, Loader2, ArrowLeft, CheckCircle, XCircle, Clock, Search } from 'lucide-react';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { Users, Plus, Loader2, ArrowLeft, CheckCircle, XCircle, Clock, Search, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Customer {
@@ -101,7 +102,7 @@ export default function ManageCustomersPage() {
       );
       toast.info('Transaction submitted. Waiting for confirmation...');
       await tx.wait();
-      toast.success(`Customer "${customerData.name}" added successfully!`);
+      toast.success(`Customer "${customerData.name}" added successfully with documents uploaded to IPFS!`);
       setCustomerData({
         name: '',
         pan: '',
@@ -177,7 +178,7 @@ export default function ManageCustomersPage() {
           Back to Dashboard
         </Button>
         <h1 className="text-4xl font-bold mb-2">Manage Customers</h1>
-        <p className="text-muted-foreground">View and manage all customers in the KYC system</p>
+        <p className="text-muted-foreground">View and manage all customers in the KYC system with document uploads</p>
       </div>
 
       {/* Add Customer Section */}
@@ -196,65 +197,93 @@ export default function ManageCustomersPage() {
         </div>
 
         {showAddForm && (
-          <form onSubmit={handleAddCustomer} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="custName">Customer Name *</Label>
-                <Input
-                  id="custName"
-                  value={customerData.name}
-                  onChange={(e) => setCustomerData({...customerData, name: e.target.value})}
-                  placeholder="e.g., John Doe"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="pan">PAN Number *</Label>
-                <Input
-                  id="pan"
-                  value={customerData.pan}
-                  onChange={(e) => setCustomerData({...customerData, pan: e.target.value})}
-                  placeholder="ABCDE1234F"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="kycId">KYC ID *</Label>
-                <Input
-                  id="kycId"
-                  value={customerData.kycId}
-                  onChange={(e) => setCustomerData({...customerData, kycId: e.target.value})}
-                  placeholder="Unique KYC ID"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ipfsAadhar">IPFS Aadhaar Hash (Optional)</Label>
-                <Input
-                  id="ipfsAadhar"
-                  value={customerData.ipfsAadhar}
-                  onChange={(e) => setCustomerData({...customerData, ipfsAadhar: e.target.value})}
-                  placeholder="QmXxx..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="ipfsPan">IPFS PAN Hash (Optional)</Label>
-                <Input
-                  id="ipfsPan"
-                  value={customerData.ipfsPan}
-                  onChange={(e) => setCustomerData({...customerData, ipfsPan: e.target.value})}
-                  placeholder="QmXxx..."
-                />
+          <form onSubmit={handleAddCustomer} className="space-y-6">
+            {/* Basic Details */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="custName">Customer Name *</Label>
+                  <Input
+                    id="custName"
+                    value={customerData.name}
+                    onChange={(e) => setCustomerData({...customerData, name: e.target.value})}
+                    placeholder="e.g., John Doe"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pan">PAN Number *</Label>
+                  <Input
+                    id="pan"
+                    value={customerData.pan}
+                    onChange={(e) => setCustomerData({...customerData, pan: e.target.value})}
+                    placeholder="ABCDE1234F"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="kycId">KYC ID *</Label>
+                  <Input
+                    id="kycId"
+                    value={customerData.kycId}
+                    onChange={(e) => setCustomerData({...customerData, kycId: e.target.value})}
+                    placeholder="Unique KYC ID"
+                    required
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex gap-2">
+
+            {/* Document Uploads */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <ImageIcon className="w-5 h-5" />
+                KYC Document Uploads (Stored on IPFS)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label className="mb-2 block">Aadhaar Card Image</Label>
+                  <ImageUpload
+                    value={customerData.ipfsAadhar}
+                    onChange={(hash) => setCustomerData({...customerData, ipfsAadhar: hash})}
+                    label="Upload Aadhaar Card"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload customer's Aadhaar card. Image will be stored on IPFS.
+                  </p>
+                </div>
+                <div>
+                  <Label className="mb-2 block">PAN Card Image</Label>
+                  <ImageUpload
+                    value={customerData.ipfsPan}
+                    onChange={(hash) => setCustomerData({...customerData, ipfsPan: hash})}
+                    label="Upload PAN Card"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload customer's PAN card. Image will be stored on IPFS.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4 border-t border-border">
               <Button type="submit" disabled={addingCustomer}>
                 {addingCustomer && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {addingCustomer ? 'Adding Customer...' : 'Add Customer'}
+                {addingCustomer ? 'Adding Customer...' : 'Add Customer to Blockchain'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setShowAddForm(false);
+                setCustomerData({
+                  name: '',
+                  pan: '',
+                  kycId: '',
+                  ipfsAadhar: '',
+                  ipfsPan: '',
+                  vcHash: ''
+                });
+              }}>
                 Cancel
               </Button>
             </div>

@@ -16,6 +16,8 @@ export const KYC_ABI = [
   "function manageRequest(string _kycId, address _bankAddress, bool response)",
   "function updateKycStatus(string _kycId, string _bName, string _remarks, uint256 _timeStamp, uint256 _verdict, bytes32 _vcHash)",
   "function getCustomerDetails(string _kycId) view returns (string kycId, string name, string pan, uint256 kycStatus, bytes32 vcHash)",
+  "function getAllCustomers(uint256 index) view returns (string kycId, string name, string pan, uint256 kycStatus, bytes32 vcHash)",
+  "function getCustomerIPFSHashes(string _kycId) view returns (string ipfsAadhar, string ipfsPan)",
   "function addAdmin(address _address) returns (bool)",
   "function removeAdmin(address _address) returns (bool)",
   "event AdminAdded(address indexed adminAddress)",
