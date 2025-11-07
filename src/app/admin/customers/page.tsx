@@ -60,78 +60,37 @@ export default function ManageCustomersPage() {
       console.log('Starting to fetch customers...');
       console.log('Contract:', contract.target);
       
-      // Get CustomerAdded events to find all customer KYC IDs
-      const filter = contract.filters.CustomerAdded();
-      const currentBlock = await provider.getBlockNumber();
-      const fromBlock = Math.max(0, currentBlock - 100000); // Last 100k blocks
+      // Get total customer count from contract
+      const count = await contract.getAllCustomersCount();
+      const totalCustomers = Number(count);
       
-      console.log(`Querying events from block ${fromBlock} to ${currentBlock}`);
+      console.log(`Total customers in contract: ${totalCustomers}`);
       
-      const events = await contract.queryFilter(filter, fromBlock, currentBlock);
-      
-      console.log(`Found ${events.length} CustomerAdded events`);
-      console.log('Sample event:', events[0]);
-      
-      // CustomerAdded event structure: indexed string is hashed, we need the non-indexed parameter
-      // Try different ways to access the KYC ID from event args
-      const kycIds: string[] = [];
-      
-      for (const event of events) {
-        try {
-          console.log('Event args:', event.args);
-          
-          // Try accessing by index - the non-indexed kycId should be at index 1
-          // Typically: CustomerAdded(indexed address, string kycId, string name)
-          let kycId = '';
-          
-          // Try different argument positions
-          if (event.args && event.args.length > 1) {
-            // Try index 1 (likely the non-indexed kycId)
-            kycId = event.args[1];
-          } else if (event.args && event.args.length > 0) {
-            // Fallback to index 0
-            kycId = event.args[0];
-          }
-          
-          // Check if it's a valid string (not a hash object)
-          if (typeof kycId === 'string' && kycId && kycId.length > 0) {
-            if (!kycIds.includes(kycId)) {
-              kycIds.push(kycId);
-              console.log('Found valid KYC ID:', kycId);
-            }
-          }
-        } catch (err) {
-          console.error('Error parsing event:', err);
-        }
-      }
-      
-      console.log('Extracted KYC IDs:', kycIds);
-      
-      if (kycIds.length === 0) {
-        console.log('No valid KYC IDs found in events');
-        toast.info('No customers found. Make sure to add customers first.');
+      if (totalCustomers === 0) {
+        console.log('No customers found in contract');
+        toast.info('No customers found. Add your first customer to get started.');
         setCustomers([]);
         setLoading(false);
         return;
       }
       
-      // Fetch details for each customer
+      // Fetch details for each customer by index
       const customersList: Customer[] = [];
-      for (const kycId of kycIds) {
+      for (let i = 0; i < totalCustomers; i++) {
         try {
-          console.log(`Fetching details for customer: ${kycId}`);
-          const customerData = await contract.getCustomerDetails(kycId);
-          console.log(`Customer data for ${kycId}:`, customerData);
+          console.log(`Fetching customer at index ${i}...`);
+          const customerData = await contract.getAllCustomers(i);
+          console.log(`Customer at index ${i}:`, customerData);
           
           customersList.push({
-            kycId: customerData[0] || kycId,
+            kycId: customerData[0] || '',
             name: customerData[1] || '',
             pan: customerData[2] || '',
             kycStatus: Number(customerData[3] || 0),
             vcHash: customerData[4] || '0x0000000000000000000000000000000000000000000000000000000000000000'
           });
         } catch (err) {
-          console.error(`Error fetching customer ${kycId}:`, err);
+          console.error(`Error fetching customer at index ${i}:`, err);
         }
       }
       
