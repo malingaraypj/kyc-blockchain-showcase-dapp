@@ -2,14 +2,20 @@
 
 import { useWeb3 } from '@/contexts/Web3Context';
 import { Button } from '@/components/ui/button';
-import { Shield, Building2, Users, FileCheck, ArrowRight, Check, Lock, Zap, Globe, AlertCircle } from 'lucide-react';
+import { Shield, Building2, Users, FileCheck, ArrowRight, Check, Lock, Zap, Globe, AlertCircle, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { isContractConfigured } from '@/lib/contract';
 
 export default function Home() {
-  const { isConnected, userRole, connectWallet, isCorrectNetwork } = useWeb3();
+  const { isConnected, userRole, connectWallet, isCorrectNetwork, isCheckingRole } = useWeb3();
   const router = useRouter();
   const contractConfigured = isContractConfigured();
+
+  const handleDashboardNavigation = () => {
+    if (userRole) {
+      router.push(`/${userRole}`);
+    }
+  };
 
   const features = [
     {
@@ -96,8 +102,13 @@ export default function Home() {
                   Connect Wallet
                   <ArrowRight className="w-5 h-5" />
                 </Button>
+              ) : isCheckingRole ? (
+                <Button size="lg" className="gap-2 text-lg px-8" disabled>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Checking Role...
+                </Button>
               ) : (
-                <Button onClick={() => router.push(`/${userRole}`)} size="lg" className="gap-2 text-lg px-8">
+                <Button onClick={handleDashboardNavigation} size="lg" className="gap-2 text-lg px-8" disabled={!userRole}>
                   Go to Dashboard
                   <ArrowRight className="w-5 h-5" />
                 </Button>
@@ -235,8 +246,13 @@ export default function Home() {
               Connect Wallet
               <ArrowRight className="w-5 h-5" />
             </Button>
+          ) : isCheckingRole ? (
+            <Button size="lg" variant="secondary" className="gap-2 text-lg px-8" disabled>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Checking Role...
+            </Button>
           ) : (
-            <Button onClick={() => router.push(`/${userRole}`)} size="lg" variant="secondary" className="gap-2 text-lg px-8">
+            <Button onClick={handleDashboardNavigation} size="lg" variant="secondary" className="gap-2 text-lg px-8" disabled={!userRole}>
               Access Dashboard
               <ArrowRight className="w-5 h-5" />
             </Button>

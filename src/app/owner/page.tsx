@@ -5,11 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function OwnerDashboard() {
-  const { isConnected, userRole, isCorrectNetwork } = useWeb3();
+  const { isConnected, userRole, isCorrectNetwork, isCheckingRole } = useWeb3();
   const router = useRouter();
   const [hasRedirected, setHasRedirected] = useState(false);
 
   useEffect(() => {
+    // Don't redirect while role is being checked
+    if (isCheckingRole) {
+      return;
+    }
+
     if (!isConnected || !isCorrectNetwork) {
       router.push('/');
       return;
@@ -23,7 +28,7 @@ export default function OwnerDashboard() {
       setHasRedirected(true);
       router.push('/');
     }
-  }, [isConnected, isCorrectNetwork, userRole, router, hasRedirected]);
+  }, [isConnected, isCorrectNetwork, userRole, isCheckingRole, router, hasRedirected]);
 
   return (
     <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">

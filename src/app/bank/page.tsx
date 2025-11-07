@@ -7,31 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Building2, Users, FileText, CheckCircle, AlertCircle, Clock, XCircle } from 'lucide-react';
 
 export default function BankDashboard() {
-  const { isConnected, userRole, isCorrectNetwork, account } = useWeb3();
+  const { isConnected, userRole, isCorrectNetwork, account, isCheckingRole } = useWeb3();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Wait for wallet and role to be determined
+    // Don't redirect while role is being checked
+    if (isCheckingRole) {
+      return;
+    }
+
+    // Redirect if not connected or wrong network
     if (!isConnected || !isCorrectNetwork) {
       router.push('/');
       return;
     }
     
-    // Only redirect if role is explicitly set and is NOT bank
+    // Only redirect if role is determined and is NOT bank
     if (userRole && userRole !== 'bank') {
       router.push('/');
       return;
     }
-    
-    // If connected and role is bank (or still loading), mark as ready
-    if (userRole === 'bank') {
-      setIsLoading(false);
-    }
-  }, [isConnected, isCorrectNetwork, userRole, router]);
+  }, [isConnected, isCorrectNetwork, userRole, isCheckingRole, router]);
 
   // Show loading state while determining role
-  if (!isConnected || isLoading) {
+  if (!isConnected || isCheckingRole) {
     return (
       <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center">

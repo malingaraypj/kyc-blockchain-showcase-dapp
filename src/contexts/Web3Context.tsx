@@ -13,6 +13,7 @@ interface Web3ContextType {
   signer: ethers.Signer | null;
   contract: ethers.Contract | null;
   userRole: 'owner' | 'admin' | 'bank' | 'customer' | null;
+  isCheckingRole: boolean;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   switchNetwork: () => Promise<void>;
@@ -40,39 +41,44 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const [signer, setSigner] = useState<ethers.Signer | null>(null);
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'bank' | 'customer' | null>(null);
+  const [isCheckingRole, setIsCheckingRole] = useState(false);
 
   const isConnected = !!account;
   const isCorrectNetwork = chainId === SEPOLIA_CHAIN_ID;
 
   const checkUserRole = async () => {
     if (!contract || !account) {
-      setUserRole(null);
       return;
     }
 
+    setIsCheckingRole(true);
     try {
       const owner = await contract.owner();
       if (owner.toLowerCase() === account.toLowerCase()) {
         setUserRole('owner');
+        setIsCheckingRole(false);
         return;
       }
 
       const isAdmin = await contract.isAdmin(account);
       if (isAdmin) {
         setUserRole('admin');
+        setIsCheckingRole(false);
         return;
       }
 
       const isBank = await contract.isBank(account);
       if (isBank) {
         setUserRole('bank');
+        setIsCheckingRole(false);
         return;
       }
 
       setUserRole('customer');
+      setIsCheckingRole(false);
     } catch (error) {
       console.error('Error checking user role:', error);
-      setUserRole(null);
+      setIsCheckingRole(false);
     }
   };
 
@@ -119,6 +125,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     setSigner(null);
     setContract(null);
     setUserRole(null);
+    setIsCheckingRole(false);
   };
 
   const switchNetwork = async () => {
@@ -128,10 +135,8 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   useEffect(() => {
     if (contract && account && isCorrectNetwork) {
       checkUserRole();
-    } else {
-      setUserRole(null);
     }
-  }, [contract, account, chainId, isCorrectNetwork]);
+  }, [contract, account, isCorrectNetwork]);
 
   useEffect(() => {
     if (typeof window.ethereum !== 'undefined') {
@@ -165,6 +170,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     signer,
     contract,
     userRole,
+    isCheckingRole,
     connectWallet,
     disconnectWallet,
     switchNetwork,
