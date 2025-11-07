@@ -4,20 +4,12 @@ import { useWeb3 } from '@/contexts/Web3Context';
 import { Button } from '@/components/ui/button';
 import { Shield, Building2, Users, FileCheck, ArrowRight, Check, Lock, Zap, Globe, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { isContractConfigured } from '@/lib/contract';
 
 export default function Home() {
   const { isConnected, userRole, connectWallet, isCorrectNetwork } = useWeb3();
   const router = useRouter();
   const contractConfigured = isContractConfigured();
-
-  useEffect(() => {
-    if (isConnected && isCorrectNetwork && userRole && contractConfigured) {
-      // Auto-redirect to role-specific dashboard
-      router.push(`/${userRole}`);
-    }
-  }, [isConnected, isCorrectNetwork, userRole, contractConfigured, router]);
 
   const features = [
     {

@@ -5,46 +5,57 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Shield, Users, Building2, FileText, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { dummyStats, dummyBanks, dummyCustomers, dummyKYCRequests } from '@/lib/dummyData';
 
 export default function AdminDashboard() {
   const { isConnected, userRole, isCorrectNetwork, account } = useWeb3();
   const router = useRouter();
-  const [stats, setStats] = useState(dummyStats.admin);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for wallet and role to be determined
     if (!isConnected || !isCorrectNetwork) {
       router.push('/');
       return;
     }
     
-    if (userRole !== 'admin' && userRole !== 'owner') {
+    // Only redirect if role is explicitly set and is NOT admin/owner
+    if (userRole && userRole !== 'admin' && userRole !== 'owner') {
       router.push('/');
+      return;
+    }
+    
+    // If connected and role is admin/owner (or still loading), mark as ready
+    if (userRole === 'admin' || userRole === 'owner') {
+      setIsLoading(false);
     }
   }, [isConnected, isCorrectNetwork, userRole, router]);
 
-  if (!isConnected || (userRole !== 'admin' && userRole !== 'owner')) {
+  // Show loading state while determining role
+  if (!isConnected || isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (userRole !== 'admin' && userRole !== 'owner') {
     return null;
   }
 
-  const recentRequests = dummyKYCRequests.slice(0, 3);
+  // TODO: Fetch real blockchain data
+  const stats = {
+    totalCustomers: 0,
+    totalBanks: 0,
+    pendingRequests: 0,
+    verifiedCustomers: 0
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Dummy Data Warning Banner */}
-      <div className="mb-6 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
-        <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-orange-500 mb-1">Displaying Dummy Data</h3>
-            <p className="text-sm text-muted-foreground">
-              This is temporary test data. Once you deploy your smart contract and add the address to .env.local, 
-              real blockchain data will be displayed here.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
         <p className="text-muted-foreground">Manage the KYC system, banks, and customers</p>
@@ -89,41 +100,10 @@ export default function AdminDashboard() {
       <div className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Recent Banks</h2>
         <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left p-4 font-semibold">Bank Name</th>
-                  <th className="text-left p-4 font-semibold">Registration No.</th>
-                  <th className="text-left p-4 font-semibold">Address</th>
-                  <th className="text-left p-4 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dummyBanks.slice(0, 3).map((bank, index) => (
-                  <tr key={index} className="border-t border-border">
-                    <td className="p-4 font-medium">{bank.name}</td>
-                    <td className="p-4 text-muted-foreground">{bank.registrationNumber}</td>
-                    <td className="p-4 font-mono text-sm text-muted-foreground">
-                      {bank.address.slice(0, 6)}...{bank.address.slice(-4)}
-                    </td>
-                    <td className="p-4">
-                      {bank.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/20">
-                          <CheckCircle className="w-3 h-3" />
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-                          <XCircle className="w-3 h-3" />
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-8 text-center text-muted-foreground">
+            <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No banks registered yet</p>
+            <p className="text-sm mt-2">Banks will appear here once they are added to the system</p>
           </div>
         </div>
       </div>
@@ -131,33 +111,12 @@ export default function AdminDashboard() {
       {/* Recent KYC Requests */}
       <div className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Recent KYC Requests</h2>
-        <div className="space-y-4">
-          {recentRequests.map((request) => (
-            <div key={request.id} className="p-6 rounded-lg bg-card border border-border">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-lg">{request.customerName}</h3>
-                  <p className="text-sm text-muted-foreground">Requested by {request.bankName}</p>
-                </div>
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium ${
-                  request.status === 'Pending' 
-                    ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
-                    : request.status === 'Approved'
-                    ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                    : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                }`}>
-                  {request.status === 'Pending' && <Clock className="w-3 h-3" />}
-                  {request.status === 'Approved' && <CheckCircle className="w-3 h-3" />}
-                  {request.status === 'Rejected' && <XCircle className="w-3 h-3" />}
-                  {request.status}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">{request.notes}</p>
-              <p className="text-xs text-muted-foreground">
-                Requested on {new Date(request.requestedAt).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="p-8 text-center text-muted-foreground">
+            <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No KYC requests yet</p>
+            <p className="text-sm mt-2">Requests will appear here once banks submit them</p>
+          </div>
         </div>
       </div>
 
