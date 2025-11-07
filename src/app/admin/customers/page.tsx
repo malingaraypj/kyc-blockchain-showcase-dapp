@@ -60,54 +60,99 @@ export default function ManageCustomersPage() {
       console.log('Starting to fetch customers...');
       console.log('Contract:', contract.target);
       
-      // Get total customer count from contract
-      const count = await contract.getAllCustomersCount();
-      const totalCustomers = Number(count);
+      // Try Method 1: Direct contract calls
+      try {
+        const count = await contract.getAllCustomersCount();
+        const totalCustomers = Number(count);
+        console.log(`Total customers count from contract: ${totalCustomers}`);
+        
+        if (totalCustomers > 0) {
+          // Try to fetch first customer to test if function works
+          console.log('Testing getAllCustomers(0)...');
+          const testCustomer = await contract.getAllCustomers(0);
+          console.log('getAllCustomers(0) succeeded:', testCustomer);
+          
+          // If successful, fetch all customers
+          const customersList: Customer[] = [];
+          for (let i = 0; i < totalCustomers; i++) {
+            const customerData = await contract.getAllCustomers(i);
+            customersList.push({
+              kycId: customerData[0] || '',
+              name: customerData[1] || '',
+              pan: customerData[2] || '',
+              kycStatus: Number(customerData[3] || 0),
+              vcHash: customerData[4] || '0x0000000000000000000000000000000000000000000000000000000000000000'
+            });
+          }
+          
+          console.log('Successfully fetched customers via direct calls:', customersList);
+          setCustomers(customersList);
+          toast.success(`Loaded ${customersList.length} customer${customersList.length > 1 ? 's' : ''}`);
+          setLoading(false);
+          return;
+        }
+      } catch (directCallError: any) {
+        console.warn('Direct contract calls failed, falling back to events:', directCallError.message);
+      }
       
-      console.log(`Total customers in contract: ${totalCustomers}`);
+      // Method 2: Fallback to events
+      console.log('Fetching customers from blockchain events...');
+      const eventFilter = contract.filters.CustomerAdded();
+      const events = await contract.queryFilter(eventFilter, 0, 'latest');
+      console.log(`Found ${events.length} CustomerAdded events`);
       
-      if (totalCustomers === 0) {
-        console.log('No customers found in contract');
+      if (events.length === 0) {
+        console.log('No CustomerAdded events found');
         toast.info('No customers found. Add your first customer to get started.');
         setCustomers([]);
         setLoading(false);
         return;
       }
       
-      // Fetch details for each customer by index
+      // Extract customer data from events
+      // Note: indexed string parameters are hashed, but non-indexed params (name, pan) are available
       const customersList: Customer[] = [];
-      for (let i = 0; i < totalCustomers; i++) {
+      const seenNames = new Set<string>();
+      
+      for (const event of events) {
         try {
-          console.log(`Fetching customer at index ${i}...`);
-          const customerData = await contract.getAllCustomers(i);
-          console.log(`Customer at index ${i}:`, customerData);
+          const name = event.args?.[1] || '';
+          const pan = event.args?.[2] || '';
           
+          // Skip duplicates (same name added multiple times)
+          if (seenNames.has(name)) continue;
+          seenNames.add(name);
+          
+          // Try to fetch full details using getCustomerDetails if we had the kycId
+          // Since indexed strings are hashed, we can't get kycId from events
+          // So we'll show partial data from events
           customersList.push({
-            kycId: customerData[0] || '',
-            name: customerData[1] || '',
-            pan: customerData[2] || '',
-            kycStatus: Number(customerData[3] || 0),
-            vcHash: customerData[4] || '0x0000000000000000000000000000000000000000000000000000000000000000'
+            kycId: 'N/A (Contract Issue)',
+            name: name,
+            pan: pan,
+            kycStatus: 0,
+            vcHash: '0x0000000000000000000000000000000000000000000000000000000000000000'
           });
         } catch (err) {
-          console.error(`Error fetching customer at index ${i}:`, err);
+          console.error('Error processing event:', err);
         }
       }
       
-      console.log('Final customers list:', customersList);
+      console.log('Customers from events:', customersList);
       setCustomers(customersList);
       
       if (customersList.length > 0) {
-        toast.success(`Loaded ${customersList.length} customer${customersList.length > 1 ? 's' : ''}`);
+        toast.warning(
+          `Loaded ${customersList.length} customer${customersList.length > 1 ? 's' : ''} from events. ` +
+          'Note: Smart contract getAllCustomers() function is not working. Please verify your contract implementation.'
+        );
       }
     } catch (error: any) {
       console.error('Error fetching customers:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        reason: error?.reason
-      });
-      toast.error(`Failed to fetch customers: ${error?.message || 'Unknown error'}. Check browser console for details.`);
+      toast.error(
+        'Failed to fetch customers. This may indicate a smart contract issue. ' +
+        'Please verify your contract is deployed correctly and has the getAllCustomers() function implemented.'
+      );
     } finally {
       setLoading(false);
     }
