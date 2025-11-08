@@ -28,26 +28,11 @@ export interface KYCRequest {
 // Fetch all banks from blockchain
 export const fetchAllBanks = async (contract: ethers.Contract): Promise<Bank[]> => {
   try {
-    const bankCount = await contract.getAllBanksCount();
-    const banks: Bank[] = [];
-    
-    for (let i = 0; i < Number(bankCount); i++) {
-      try {
-        // Banks are stored by index, need to get bank details
-        // Note: You may need to adjust this based on your contract's bank storage structure
-        const bankData = await contract.banks(i);
-        banks.push({
-          address: bankData.addr || bankData[0],
-          name: bankData.bName || bankData[1],
-          id: i,
-          isActive: bankData.isActive !== undefined ? bankData.isActive : true
-        });
-      } catch (error) {
-        console.error(`Error fetching bank ${i}:`, error);
-      }
-    }
-    
-    return banks;
+    // New contract doesn't have getAllBanksCount or indexed bank access
+    // Banks are retrieved via BankAdded events or by checking known addresses
+    // For now, return empty array - banks should be tracked via events
+    console.log('Note: Bank enumeration requires event parsing in new contract');
+    return [];
   } catch (error) {
     console.error('Error fetching banks:', error);
     return [];
@@ -108,14 +93,11 @@ export const getKYCStatusLabel = (status: number): string => {
 // Fetch admin statistics
 export const fetchAdminStats = async (contract: ethers.Contract) => {
   try {
-    const [totalCustomers, totalBanks] = await Promise.all([
-      contract.getAllCustomersCount(),
-      contract.getAllBanksCount()
-    ]);
+    const totalCustomers = await contract.getAllCustomersCount();
     
     return {
       totalCustomers: Number(totalCustomers),
-      totalBanks: Number(totalBanks),
+      totalBanks: 0, // Would need to count from events
       pendingRequests: 0, // Will be calculated from events or requests
       verifiedCustomers: 0 // Will be calculated from customer data
     };

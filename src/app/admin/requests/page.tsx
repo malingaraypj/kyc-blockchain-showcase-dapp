@@ -59,15 +59,26 @@ export default function ReviewRequestsPage() {
           const customerData = await contract.getAllCustomers(i);
           const kycId = customerData[0];
           
-          // Try to fetch IPFS hashes if available
+          // Fetch records (Aadhaar and PAN IPFS hashes) from customer records
           let ipfsAadhar = '';
           let ipfsPan = '';
           try {
-            const ipfsData = await contract.getCustomerIPFSHashes(kycId);
-            ipfsAadhar = ipfsData[0] || ipfsData.ipfsAadhar || '';
-            ipfsPan = ipfsData[1] || ipfsData.ipfsPan || '';
+            const recordsCount = await contract.getCustomerRecordsCount(kycId);
+            const count = Number(recordsCount);
+            
+            for (let j = 0; j < count; j++) {
+              const record = await contract.getCustomerRecord(kycId, j);
+              const recordType = record.bName || record[0]; // bName contains record type
+              const recordData = record.data || record[1]; // data contains IPFS hash
+              
+              if (recordType === 'aadhar' || recordType === 'aadhaar') {
+                ipfsAadhar = recordData;
+              } else if (recordType === 'pan') {
+                ipfsPan = recordData;
+              }
+            }
           } catch (err) {
-            console.log(`IPFS hashes not available for ${kycId}`);
+            console.log(`Records not available for ${kycId}`);
           }
           
           customersList.push({

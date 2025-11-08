@@ -115,18 +115,16 @@ export default function BankDashboard() {
 
   const handleUpdateKYC = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contract || !updateData.kycId || !updateData.bankName) return;
+    if (!contract || !updateData.kycId) return;
 
     setUpdatingKYC(true);
     try {
-      const timestamp = Math.floor(Date.now() / 1000);
       const vcHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
       
+      // Updated function signature - removed bankName and timestamp
       const tx = await contract.updateKycStatus(
         updateData.kycId,
-        updateData.bankName,
         updateData.remarks,
-        timestamp,
         Number(updateData.verdict),
         vcHash
       );
@@ -305,16 +303,6 @@ export default function BankDashboard() {
                   value={updateData.kycId}
                   onChange={(e) => setUpdateData({...updateData, kycId: e.target.value})}
                   placeholder="KYC ID"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="bankName">Bank Name</Label>
-                <Input
-                  id="bankName"
-                  value={updateData.bankName}
-                  onChange={(e) => setUpdateData({...updateData, bankName: e.target.value})}
-                  placeholder="Your bank name"
                   required
                 />
               </div>
