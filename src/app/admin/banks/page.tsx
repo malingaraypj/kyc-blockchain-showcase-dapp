@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, Plus, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { ethers } from 'ethers';
 
 interface Bank {
   address: string;
@@ -47,27 +48,34 @@ export default function ManageBanksPage() {
     if (!contract) return;
     setLoading(true);
     try {
-      const banksCount = await contract.getAllBanksCount();
-      const count = Number(banksCount);
+      // Fetch BankAdded events from the blockchain
+      const filter = contract.filters.BankAdded();
+      const events = await contract.queryFilter(filter);
       
       const banksList: Bank[] = [];
-      for (let i = 0; i < count; i++) {
-        try {
-          const bankData = await contract.getAllBanks(i);
+      const seenAddresses = new Set<string>();
+      
+      for (const event of events) {
+        const bankAddress = event.args?.bankAddress;
+        const name = event.args?.name;
+        const id = event.args?.id;
+        
+        if (bankAddress && !seenAddresses.has(bankAddress)) {
+          seenAddresses.add(bankAddress);
           banksList.push({
-            id: i,
-            address: bankData[0],
-            name: bankData[1]
+            address: bankAddress,
+            name: name || 'Unknown',
+            id: Number(id || 0)
           });
-        } catch (err) {
-          console.error(`Error fetching bank ${i}:`, err);
         }
       }
       
+      // Sort by ID
+      banksList.sort((a, b) => a.id - b.id);
       setBanks(banksList);
     } catch (error) {
       console.error('Error fetching banks:', error);
-      toast.error('Failed to fetch banks');
+      toast.error('Failed to fetch banks from blockchain');
     } finally {
       setLoading(false);
     }
@@ -76,6 +84,12 @@ export default function ManageBanksPage() {
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contract || !bankName || !bankAddress) return;
+
+    // Validate Ethereum address
+    if (!ethers.isAddress(bankAddress)) {
+      toast.error('Invalid Ethereum address');
+      return;
+    }
 
     setAddingBank(true);
     try {
