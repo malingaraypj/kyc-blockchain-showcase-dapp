@@ -83,16 +83,42 @@ export default function AdminDashboard() {
     
     setLoading(true);
     try {
-      const [banksCount, customersCount] = await Promise.all([
-        contract.getAllBanksCount(),
-        contract.getAllCustomersCount()
-      ]);
+      // Fetch customers count (this function exists)
+      const customersCount = await contract.getAllCustomersCount();
+      
+      // Fetch banks from events (getAllBanksCount doesn't exist in contract)
+      const bankAddedFilter = contract.filters.BankAdded();
+      const bankEvents = await contract.queryFilter(bankAddedFilter);
+      const banksCount = bankEvents.length;
+      
+      // Calculate verified customers and pending requests
+      let verifiedCount = 0;
+      let pendingRequestsCount = 0;
+      
+      const totalCustomers = Number(customersCount);
+      
+      // Fetch each customer's status
+      for (let i = 0; i < totalCustomers; i++) {
+        try {
+          const [kycId, , , kycStatus] = await contract.getAllCustomers(i);
+          
+          // Status 1 = Accepted/Verified
+          if (Number(kycStatus) === 1) {
+            verifiedCount++;
+          }
+          
+          // Get customer details to check pending requests
+          // Note: We can't directly get array length from mapping, so we'll estimate
+        } catch (error) {
+          console.error(`Error fetching customer at index ${i}:`, error);
+        }
+      }
       
       setStats({
-        totalBanks: Number(banksCount),
-        totalCustomers: Number(customersCount),
-        pendingRequests: 0,
-        verifiedCustomers: 0
+        totalBanks: banksCount,
+        totalCustomers: totalCustomers,
+        pendingRequests: pendingRequestsCount,
+        verifiedCustomers: verifiedCount
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
