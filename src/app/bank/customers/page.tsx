@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Search, Loader2, CheckCircle, Clock, XCircle, AlertCircle, ArrowLeft, FileText } from 'lucide-react';
+import { Users, Search, Loader2, CheckCircle, Clock, XCircle, AlertCircle, ArrowLeft, FileText, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Customer {
@@ -24,6 +24,7 @@ export default function BankCustomersPage() {
   const [customerDetails, setCustomerDetails] = useState<Customer | null>(null);
   const [fetchingCustomer, setFetchingCustomer] = useState(false);
   const [searchHistory, setSearchHistory] = useState<Customer[]>([]);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   useEffect(() => {
     if (isCheckingRole) {
@@ -46,14 +47,36 @@ export default function BankCustomersPage() {
     if (!contract || !searchKycId) return;
 
     setFetchingCustomer(true);
+    setErrorDetails(null);
+    setCustomerDetails(null);
+    
     try {
+      // First check if customer exists in the system
+      const isRegistered = await contract.isCustomerRegistered(searchKycId);
+      if (!isRegistered) {
+        setErrorDetails('KYC ID not found in the system. Please verify the KYC ID is correct.');
+        toast.error('KYC ID not found');
+        setFetchingCustomer(false);
+        return;
+      }
+
+      // Check if bank is authorized to view this customer
+      const isAuthorized = await contract.isBankAuthorized(searchKycId, account);
+      if (!isAuthorized) {
+        setErrorDetails('Access denied: Your bank does not have authorization to view this customer. You must first submit a KYC request for this customer and get it approved by an admin.');
+        toast.error('Authorization required');
+        setFetchingCustomer(false);
+        return;
+      }
+
+      // Try to get customer details
       const details = await contract.getCustomerDetails(searchKycId);
       const customer: Customer = {
-        kycId: details.kycId,
-        name: details.name,
-        pan: details.pan,
-        kycStatus: Number(details.kycStatus),
-        vcHash: details.vcHash
+        kycId: details[0],
+        name: details[1],
+        pan: details[2],
+        kycStatus: Number(details[3]),
+        vcHash: details[4]
       };
       setCustomerDetails(customer);
       
@@ -62,11 +85,29 @@ export default function BankCustomersPage() {
         setSearchHistory(prev => [customer, ...prev].slice(0, 5)); // Keep last 5 searches
       }
       
+      setErrorDetails(null);
       toast.success('Customer details retrieved!');
     } catch (error: any) {
       console.error('Error fetching customer:', error);
-      toast.error('Customer not found or you do not have access to this customer');
-      setCustomerDetails(null);
+      
+      // Parse the error to provide better feedback
+      let errorMessage = 'Unable to retrieve customer details';
+      let detailedMessage = '';
+      
+      if (error.message) {
+        if (error.message.includes('not authorized') || error.message.includes('access denied')) {
+          errorMessage = 'Access Denied';
+          detailedMessage = 'Your bank does not have permission to view this customer. Please submit a KYC request first and wait for admin approval.';
+        } else if (error.message.includes('revert')) {
+          errorMessage = 'Access Restricted';
+          detailedMessage = 'This customer exists, but your bank has not been granted access. Submit a request from the "My Requests" page.';
+        } else {
+          detailedMessage = `Error: ${error.message.slice(0, 200)}`;
+        }
+      }
+      
+      setErrorDetails(detailedMessage || errorMessage);
+      toast.error(errorMessage);
     } finally {
       setFetchingCustomer(false);
     }
@@ -134,6 +175,27 @@ export default function BankCustomersPage() {
         <p className="text-muted-foreground">Search and view customer KYC information you have access to</p>
       </div>
 
+      {/* Important Notice */}
+      <div className="mb-8 p-6 rounded-lg bg-blue-500/5 border border-blue-500/20">
+        <div className="flex gap-3">
+          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold mb-1 text-blue-700 dark:text-blue-400">Bank Access Control</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              You can only view customers that your bank has been authorized to access. To gain access to a customer's KYC data:
+            </p>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1 ml-2">
+              <li>Submit a KYC request from the "My Requests" page</li>
+              <li>Wait for admin approval of your request</li>
+              <li>Once approved, you can view and update the customer's KYC status</li>
+            </ol>
+            <p className="text-sm text-muted-foreground mt-2">
+              <strong>Your Bank:</strong> <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono">{account}</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Search Section */}
       <div className="mb-8 p-6 rounded-lg bg-card border border-border">
         <div className="flex items-center gap-3 mb-4">
@@ -160,6 +222,34 @@ export default function BankCustomersPage() {
           You can only view customers you have requested access to or have been granted permission
         </p>
       </div>
+
+      {/* Error Details */}
+      {errorDetails && (
+        <div className="mb-8 p-6 rounded-lg bg-red-500/5 border border-red-500/20">
+          <div className="flex gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold mb-1 text-red-700 dark:text-red-400">Unable to Access Customer Details</h3>
+              <p className="text-sm text-muted-foreground mb-3">{errorDetails}</p>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p className="font-semibold">How to gain access:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Go to the "My Requests" page</li>
+                  <li>Submit a new KYC request with the customer's KYC ID</li>
+                  <li>Wait for an admin to approve your request</li>
+                  <li>Once approved, return here to view the customer details</li>
+                </ol>
+                <div className="mt-3">
+                  <Button onClick={() => router.push('/bank/requests')} variant="outline" size="sm" className="gap-2">
+                    <FileText className="w-4 h-4" />
+                    Go to My Requests
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search History */}
       {searchHistory.length > 0 && (
@@ -260,7 +350,7 @@ export default function BankCustomersPage() {
       )}
 
       {/* No Data State */}
-      {!customerDetails && (
+      {!customerDetails && !errorDetails && (
         <div className="mb-8 p-12 rounded-lg bg-card border border-border text-center">
           <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h3 className="text-xl font-semibold mb-2">No Customer Selected</h3>

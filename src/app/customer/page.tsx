@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Shield, Building2, FileCheck, AlertCircle, CheckCircle, Clock, Search, Loader2, XCircle } from 'lucide-react';
+import { User, Shield, Building2, FileCheck, AlertCircle, CheckCircle, Clock, Search, Loader2, XCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CustomerDetails {
@@ -24,6 +24,7 @@ export default function CustomerDashboard() {
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null);
   const [searchKycId, setSearchKycId] = useState('');
   const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   useEffect(() => {
     if (isCheckingRole) {
@@ -46,20 +47,51 @@ export default function CustomerDashboard() {
     if (!contract || !searchKycId) return;
 
     setFetchingDetails(true);
+    setErrorDetails(null);
+    setCustomerDetails(null);
+    
     try {
+      // First check if customer exists
+      const isRegistered = await contract.isCustomerRegistered(searchKycId);
+      if (!isRegistered) {
+        setErrorDetails('KYC ID not found in the system. Please verify the KYC ID is correct.');
+        toast.error('KYC ID not found');
+        setFetchingDetails(false);
+        return;
+      }
+
+      // Try to get customer details
       const details = await contract.getCustomerDetails(searchKycId);
       setCustomerDetails({
-        kycId: details.kycId,
-        name: details.name,
-        pan: details.pan,
-        kycStatus: Number(details.kycStatus),
-        vcHash: details.vcHash
+        kycId: details[0],
+        name: details[1],
+        pan: details[2],
+        kycStatus: Number(details[3]),
+        vcHash: details[4]
       });
+      setErrorDetails(null);
       toast.success('Customer details retrieved!');
     } catch (error: any) {
       console.error('Error fetching customer details:', error);
-      toast.error('Customer not found or you do not have access');
-      setCustomerDetails(null);
+      
+      // Parse the error to provide better feedback
+      let errorMessage = 'Unable to retrieve customer details';
+      let detailedMessage = '';
+      
+      if (error.message) {
+        if (error.message.includes('not authorized') || error.message.includes('access denied')) {
+          errorMessage = 'Access Denied';
+          detailedMessage = 'As a customer, you can only view your own KYC details. Make sure you entered YOUR KYC ID that was registered with your wallet address.';
+        } else if (error.message.includes('revert')) {
+          errorMessage = 'Access Restricted';
+          detailedMessage = 'This KYC ID exists, but you do not have permission to view it. Only the customer who owns this KYC ID can view these details.';
+        } else {
+          detailedMessage = `Error: ${error.message.slice(0, 200)}`;
+        }
+      }
+      
+      setErrorDetails(detailedMessage || errorMessage);
+      toast.error(errorMessage);
     } finally {
       setFetchingDetails(false);
     }
@@ -114,6 +146,22 @@ export default function CustomerDashboard() {
         <p className="text-muted-foreground">View your KYC status and authorized banks</p>
       </div>
 
+      {/* Important Notice */}
+      <div className="mb-8 p-6 rounded-lg bg-blue-500/5 border border-blue-500/20">
+        <div className="flex gap-3">
+          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold mb-1 text-blue-700 dark:text-blue-400">Important: Access Control</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              You can only view KYC details for YOUR own account. Enter the KYC ID that was registered with your connected wallet address.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <strong>Connected Wallet:</strong> <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono">{account}</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Search KYC Section */}
       <div className="mb-8 p-6 rounded-lg bg-card border border-border">
         <div className="flex items-center gap-3 mb-4">
@@ -140,6 +188,28 @@ export default function CustomerDashboard() {
           Enter your unique KYC ID to view your verification status and details
         </p>
       </div>
+
+      {/* Error Details */}
+      {errorDetails && (
+        <div className="mb-8 p-6 rounded-lg bg-red-500/5 border border-red-500/20">
+          <div className="flex gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold mb-1 text-red-700 dark:text-red-400">Unable to Access Customer Details</h3>
+              <p className="text-sm text-muted-foreground mb-3">{errorDetails}</p>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p className="font-semibold">Troubleshooting Steps:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Verify you entered YOUR correct KYC ID (the one registered with your wallet)</li>
+                  <li>Make sure your wallet address matches the one used during KYC registration</li>
+                  <li>If you're unsure of your KYC ID, contact your bank or the system administrator</li>
+                  <li>You cannot view other customers' KYC details for privacy protection</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KYC Details Display */}
       {customerDetails && (
@@ -246,7 +316,7 @@ export default function CustomerDashboard() {
       )}
 
       {/* No Data State */}
-      {!customerDetails && (
+      {!customerDetails && !errorDetails && (
         <div className="mb-8 p-12 rounded-lg bg-card border border-border text-center">
           <User className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h3 className="text-xl font-semibold mb-2">No KYC Details Loaded</h3>
