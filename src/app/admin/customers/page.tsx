@@ -29,6 +29,7 @@ export default function ManageCustomersPage() {
     name: '',
     pan: '',
     kycId: '',
+    customerAddress: '',
     ipfsAadhar: '',
     ipfsPan: '',
     vcHash: ''
@@ -100,6 +101,7 @@ export default function ManageCustomersPage() {
       const eventFilter = contract.filters.CustomerAdded();
       const events = await contract.queryFilter(eventFilter, 0, 'latest');
       console.log(`Found ${events.length} CustomerAdded events`);
+      console.log('Raw events:', events);
       
       if (events.length === 0) {
         console.log('No CustomerAdded events found');
@@ -110,41 +112,69 @@ export default function ManageCustomersPage() {
       }
       
       // Extract customer data from events
-      // Use event signature + block number + transaction index for unique identification
       const customersList: Customer[] = [];
       const seenEventIds = new Set<string>();
       
-      for (const event of events) {
+      for (let idx = 0; idx < events.length; idx++) {
+        const event = events[idx];
         try {
-          // Create unique identifier for this event (blockNumber + transactionIndex + logIndex)
+          console.log(`\n--- Processing Event ${idx + 1}/${events.length} ---`);
+          console.log('Event details:', {
+            blockNumber: event.blockNumber,
+            transactionHash: event.transactionHash,
+            transactionIndex: event.transactionIndex,
+            logIndex: event.index
+          });
+          console.log('Event args:', event.args);
+          
+          // Create unique identifier for this event
           const eventId = `${event.blockNumber}-${event.transactionIndex}-${event.index}`;
+          console.log('Event ID:', eventId);
           
           // Skip if we've already processed this exact event
           if (seenEventIds.has(eventId)) {
-            console.log(`Skipping duplicate event: ${eventId}`);
+            console.log(`❌ Skipping duplicate event: ${eventId}`);
             continue;
           }
           seenEventIds.add(eventId);
           
+          // Extract data from event args
+          // Event signature: CustomerAdded(string indexed kycId, string name, string pan)
+          // args[0] = kycId (indexed string, will be hash)
+          // args[1] = name
+          // args[2] = pan
+          const kycIdHash = event.args?.[0] || '';
           const name = event.args?.[1] || '';
           const pan = event.args?.[2] || '';
           
-          console.log(`Processing event ${eventId}: name="${name}", pan="${pan}"`);
+          console.log('Extracted data:', {
+            kycIdHash: kycIdHash,
+            name: name,
+            pan: pan
+          });
           
           // Add customer from event data
-          customersList.push({
+          const customer = {
             kycId: 'N/A (Contract Issue)',
             name: name,
             pan: pan,
             kycStatus: 0,
             vcHash: '0x0000000000000000000000000000000000000000000000000000000000000000'
-          });
+          };
+          
+          customersList.push(customer);
+          console.log(`✅ Added customer ${idx + 1}:`, customer);
         } catch (err) {
-          console.error('Error processing event:', err);
+          console.error(`❌ Error processing event ${idx}:`, err);
         }
       }
       
-      console.log(`Final customers list: ${customersList.length} customers`, customersList);
+      console.log(`\n=== Final Results ===`);
+      console.log(`Total events found: ${events.length}`);
+      console.log(`Unique events processed: ${seenEventIds.size}`);
+      console.log(`Customers added to list: ${customersList.length}`);
+      console.log('Final customers list:', customersList);
+      
       setCustomers(customersList);
       
       if (customersList.length > 0) {
@@ -166,7 +196,7 @@ export default function ManageCustomersPage() {
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contract || !customerData.name || !customerData.pan || !customerData.kycId) return;
+    if (!contract || !customerData.name || !customerData.pan || !customerData.kycId || !customerData.customerAddress) return;
 
     setAddingCustomer(true);
     try {
@@ -175,17 +205,19 @@ export default function ManageCustomersPage() {
         customerData.name,
         customerData.pan,
         customerData.kycId,
+        customerData.customerAddress,
         customerData.ipfsAadhar || '',
         customerData.ipfsPan || '',
         vcHash
       );
       toast.info('Transaction submitted. Waiting for confirmation...');
       await tx.wait();
-      toast.success(`Customer "${customerData.name}" added successfully with documents uploaded to IPFS!`);
+      toast.success(`Customer "${customerData.name}" added successfully with wallet address linked!`);
       setCustomerData({
         name: '',
         pan: '',
         kycId: '',
+        customerAddress: '',
         ipfsAadhar: '',
         ipfsPan: '',
         vcHash: ''
@@ -284,7 +316,7 @@ export default function ManageCustomersPage() {
             {/* Basic Details */}
             <div>
               <h3 className="text-lg font-semibold mb-3">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="custName">Customer Name *</Label>
                   <Input
@@ -294,6 +326,19 @@ export default function ManageCustomersPage() {
                     placeholder="e.g., John Doe"
                     required
                   />
+                </div>
+                <div>
+                  <Label htmlFor="customerAddress">Customer Wallet Address *</Label>
+                  <Input
+                    id="customerAddress"
+                    value={customerData.customerAddress}
+                    onChange={(e) => setCustomerData({...customerData, customerAddress: e.target.value})}
+                    placeholder="0x..."
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Customer's Ethereum wallet address for login access
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="pan">PAN Number *</Label>
@@ -362,6 +407,7 @@ export default function ManageCustomersPage() {
                   name: '',
                   pan: '',
                   kycId: '',
+                  customerAddress: '',
                   ipfsAadhar: '',
                   ipfsPan: '',
                   vcHash: ''

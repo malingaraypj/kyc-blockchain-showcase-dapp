@@ -45,6 +45,7 @@ export default function AdminDashboard() {
     name: '',
     pan: '',
     kycId: '',
+    customerAddress: '',
     ipfsAadhar: '',
     ipfsPan: '',
     vcHash: ''
@@ -152,7 +153,7 @@ export default function AdminDashboard() {
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contract || !customerData.name || !customerData.pan || !customerData.kycId) return;
+    if (!contract || !customerData.name || !customerData.pan || !customerData.kycId || !customerData.customerAddress) return;
 
     setAddingCustomer(true);
     try {
@@ -161,17 +162,19 @@ export default function AdminDashboard() {
         customerData.name,
         customerData.pan,
         customerData.kycId,
+        customerData.customerAddress,
         customerData.ipfsAadhar || '',
         customerData.ipfsPan || '',
         vcHash
       );
       toast.info('Transaction submitted. Waiting for confirmation...');
       await tx.wait();
-      toast.success(`Customer "${customerData.name}" added successfully!`);
+      toast.success(`Customer "${customerData.name}" added successfully with wallet address linked!`);
       setCustomerData({
         name: '',
         pan: '',
         kycId: '',
+        customerAddress: '',
         ipfsAadhar: '',
         ipfsPan: '',
         vcHash: ''
@@ -331,6 +334,16 @@ export default function AdminDashboard() {
                   value={customerData.name}
                   onChange={(e) => setCustomerData({...customerData, name: e.target.value})}
                   placeholder="Customer name"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="customerAddress">Wallet Address</Label>
+                <Input
+                  id="customerAddress"
+                  value={customerData.customerAddress}
+                  onChange={(e) => setCustomerData({...customerData, customerAddress: e.target.value})}
+                  placeholder="0x..."
                   required
                 />
               </div>
